@@ -90,7 +90,7 @@ class ModelArguments:
         }
     ) 
     hard_negative_weight: float = field(
-        default=0.5,
+        default=5.0,
         metadata={
             "help": "The **logit** of weight for hard negatives (only effective if hard negatives are used)."
         }
@@ -177,11 +177,11 @@ model_args = ModelArguments()
 data_args = DataTrainingArguments
 
 
-#model = BertForCL.from_pretrained(
-#    'bert-base-uncased',
-#    from_tf=bool(".ckpt" in 'bert-base-uncased'),
-#    config = AutoConfig.from_pretrained('bert-base-uncased'),
-#    model_args = model_args)
+model = BertForCL.from_pretrained(
+    'bert-base-uncased',
+    from_tf=bool(".ckpt" in 'bert-base-uncased'),
+    config = AutoConfig.from_pretrained('bert-base-uncased'),
+    model_args = model_args)
 
 @dataclass
 class OurDataCollatorWithPadding:
@@ -309,136 +309,53 @@ def prepare_features(examples):
     return features
 
 
-#extension = 'csv'
-#datasets = load_dataset(extension, data_files='/data/1_data_server/kkm/TAGSv2/SimCSE/data/nli_for_simcse.csv', cache_dir="./data/")
-#tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
+extension = 'csv'
+datasets = load_dataset(extension,delimiter='\t', data_files='/data/1_data_server/kkm/TAGSv2/contrastive_data.tsv', cache_dir="./data/")
+tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
 
-#column_names = datasets["train"].column_names
-#sent2_cname = None
-#if len(column_names) == 2:
-#    # Pair datasets
-#    sent0_cname = column_names[0]
-#    sent1_cname = column_names[1]
-#elif len(column_names) == 3:
-#    # Pair datasets with hard negatives
-#    sent0_cname = column_names[0]
-#    sent1_cname = column_names[1]
-#    sent2_cname = column_names[2]
-#elif len(column_names) == 1:
-#    # Unsupervised datasets
-#    sent0_cname = column_names[0]
-#    sent1_cname = column_names[0]
-#else:
-#    raise NotImplementedError
-#train_dataset = datasets["train"].map(
-#            prepare_features,
-#            batched=True,
-#            num_proc=data_args.preprocessing_num_workers,
-#            remove_columns=column_names,
-#            load_from_cache_file=not data_args.overwrite_cache,
-#        )
-
-#data_collator = OurDataCollatorWithPadding(tokenizer)
-#training_args = OurTrainingArguments('result')
-
-#trainer = CLTrainer(
-#    model=model,
-#    args=training_args,
-#    train_dataset=train_dataset,
-#    tokenizer=tokenizer,
-#    data_collator=data_collator,
-#    
-#)
-#trainer.model_args = model_args
-#trainer.use_amp = False
-
-def train_selection_model():
-    train_result = trainer.train(model_path = None)
-
-class selection_model():
-    def __init__(self):
-        self.model_args = ModelArguments()
-        self.data_args = DataTrainingArguments
-        self.tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
-        self.model = BertForCL.from_pretrained(
-            'bert-base-uncased',
-            from_tf=bool(".ckpt" in 'bert-base-uncased'),
-            config = AutoConfig.from_pretrained('bert-base-uncased'),
-            model_args = model_args)
-        self.data_collator = OurDataCollatorWithPadding(self.tokenizer)
-        self.training_args = OurTrainingArguments('result/tt')
-    
-    def train(self):
-        datasets =  load_dataset('csv',delimiter='\t',data_files='/data/1_data_server/kkm/TAGSv2/contrastive_data.tsv', cache_dir="./data/")
-        column_names = datasets["train"].column_names
-        sent2_cname = None
-        
-        if len(column_names) == 2:
-            # Pair datasets
-            sent0_cname = column_names[0]
-            sent1_cname = column_names[1]
-        elif len(column_names) == 3:
-            # Pair datasets with hard negatives
-            sent0_cname = column_names[0]
-            sent1_cname = column_names[1]
-            sent2_cname = column_names[2]
-        elif len(column_names) == 1:
-            # Unsupervised datasets
-            sent0_cname = column_names[0]
-            sent1_cname = column_names[0]
-        else:
-            raise NotImplementedError
-        def prepare_features(examples):
-
-            total = len(examples[sent0_cname])
-            # Avoid "None" fields 
-            for idx in range(total):
-                if examples[sent0_cname][idx] is None:
-                    examples[sent0_cname][idx] = " "
-                if examples[sent1_cname][idx] is None:
-                    examples[sent1_cname][idx] = " "
-            
-            sentences = examples[sent0_cname] + examples[sent1_cname]
-            # If hard negative exists
-            if sent2_cname is not None:
-                for idx in range(total):
-                    if examples[sent2_cname][idx] is None:
-                        examples[sent2_cname][idx] = " "
-                sentences += examples[sent2_cname]
-            sent_features = self.tokenizer(
-                sentences,
-                max_length=data_args.max_seq_length,
-                truncation=True,
-                padding="max_length" if data_args.pad_to_max_length else False,
-            )
-            features = {}
-            if sent2_cname is not None:
-                for key in sent_features:
-                    features[key] = [[sent_features[key][i], sent_features[key][i+total], sent_features[key][i+total*2]] for i in range(total)]
-            else:
-                for key in sent_features:
-                    features[key] = [[sent_features[key][i], sent_features[key][i+total]] for i in range(total)]
-                
-            return features
-        train_dataset = datasets["train"].map(
+column_names = datasets["train"].column_names
+sent2_cname = None
+if len(column_names) == 2:
+    # Pair datasets
+    sent0_cname = column_names[0]
+    sent1_cname = column_names[1]
+elif len(column_names) == 3:
+    # Pair datasets with hard negatives
+    sent0_cname = column_names[0]
+    sent1_cname = column_names[1]
+    sent2_cname = column_names[2]
+elif len(column_names) == 1:
+    # Unsupervised datasets
+    sent0_cname = column_names[0]
+    sent1_cname = column_names[0]
+else:
+    raise NotImplementedError
+train_dataset = datasets["train"].map(
             prepare_features,
             batched=True,
             num_proc=data_args.preprocessing_num_workers,
             remove_columns=column_names,
             load_from_cache_file=not data_args.overwrite_cache,
         )
-        self.training_args.run_name = 'test'
-        self.training_args.num_train_epochs = 10
-        self.training_args.fp16 = True
+data_collator = OurDataCollatorWithPadding(tokenizer)
+training_args = OurTrainingArguments('result')
 
-        trainer = CLTrainer(
-            model=self.model,
-            args=self.training_args,
+
+class sss():
+
+    def train_selection_model(self,model):
+        training_args.num_train_epochs = 5
+        training_args.run_name = 'rt'
+        trainer2 = CLTrainer(
+            model=model,
+            args=training_args,
             train_dataset=train_dataset,
-            tokenizer=self.tokenizer,
-            data_collator=self.data_collator,
+            tokenizer=tokenizer,
+            data_collator=data_collator,
         )
+        trainer2.model_args = model_args
+        trainer2.use_amp = False
+        train_result = trainer2.train(model_path = None)
+        trainer2._save_checkpoint(model, 0)
+        return model
 
-        trainer.model_args = self.model_args
-        trainer.use_amp = False
-        train_result = trainer.train()
